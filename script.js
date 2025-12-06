@@ -56,6 +56,8 @@ function openLoginModal() {
 
     modal.classList.add("active");
     document.body.style.overflow = "hidden";
+
+
 }
 
 function openSignupModal() {
@@ -227,36 +229,136 @@ function renderRecipes() {
     }
 
     grid.innerHTML = filtered.map(r => {
-        const isLiked = r.likes > 0 ? "liked" : "";
-        const canEdit = currentUser && (currentUser.role === "admin" || currentUser.username === r.author);
+        const isSaved = currentUser?.favorites?.includes(r.id);
+        const isLiked = r.likes > 0;
 
         return `
-        <div class="recipe-card">
+        <div class="recipe-card" style="position:relative;">
+
+            <!-- ❤️ Favorite button -->
+            <button class="fav-btn"
+                onclick="event.stopPropagation(); toggleFavorite(${r.id})"
+                style="
+                    position:absolute;top:10px;right:10px;
+                    background:white;border:none;border-radius:50%;
+                    width:40px;height:40px;display:flex;align-items:center;
+                    justify-content:center;font-size:20px;cursor:pointer;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+                ">
+                ${isSaved ? "❤️" : "🤍"}
+            </button>
+
             <img class="recipe-image" src="${r.image}" onclick="showRecipeDetail(${r.id})">
 
             <div class="recipe-content">
                 <h3 class="recipe-title" onclick="showRecipeDetail(${r.id})">${r.title}</h3>
                 <span class="recipe-category">${r.category}</span>
+
                 <p style="color:#666;margin:10px 0">⏱️ ${r.prepTime} min • ❤️ ${r.likes} likes</p>
 
+                <div class="recipe-rating" style="margin:6px 0;">
+                    ${renderStars(r.rating || 0)}
+                </div>
+
                 <div class="recipe-actions">
-                    <button class="action-btn like-btn ${isLiked}"
+                    <button class="action-btn like-btn ${isLiked ? "liked" : ""}"
                         onclick="event.stopPropagation(); toggleLike(${r.id}, ${r.likes})">
-                        ${isLiked ? '❤️' : '🤍'} ${r.likes}
+                        ${isLiked ? "❤️" : "🤍"} ${r.likes}
                     </button>
 
-                    <button class="action-btn" onclick="event.stopPropagation(); shareRecipe(${r.id})">Share</button>
-
-                    ${canEdit ? `
-                        <button class="action-btn" onclick="event.stopPropagation(); editRecipe(${r.id})">Edit</button>
-                        <button class="action-btn" onclick="event.stopPropagation(); deleteRecipe(${r.id})">Delete</button>
-                    ` : ""}
+                    <button class="action-btn" onclick="event.stopPropagation(); shareRecipe(${r.id})">
+                        Share
+                    </button>
                 </div>
             </div>
         </div>
         `;
     }).join("");
 }
+function showFavorites() {
+    if (!currentUser) return openLoginModal();
+    window.currentPage = "favorites";
+
+    const grid = document.getElementById("recipeGrid");
+    const favIds = currentUser.favorites || [];
+
+    if (favIds.length === 0) {
+        grid.innerHTML = `
+            <p style="grid-column:1/-1;text-align:center;color:#777;font-size:1.1em;">
+                ⭐ You have no favorite recipes yet.
+            </p>`;
+        return;
+    }
+
+    const favoriteRecipes = recipes.filter(r => favIds.includes(r.id));
+
+    grid.innerHTML = favoriteRecipes.map(r => {
+        const isLiked = r.likes > 0;
+        const isSaved = currentUser?.favorites?.includes(r.id);
+
+        return `
+        <div class="recipe-card" style="position:relative;">
+
+            <!-- ❤️ Floating Favorite Button -->
+            <button class="fav-btn"
+                onclick="event.stopPropagation(); toggleFavorite(${r.id}); showFavorites();"
+                style="
+                    position:absolute;top:10px;right:10px;
+                    background:white;border:none;border-radius:50%;
+                    width:40px;height:40px;display:flex;align-items:center;
+                    justify-content:center;font-size:20px;cursor:pointer;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+                ">
+                ${isSaved ? "❤️" : "🤍"}
+            </button>
+
+            <img class="recipe-image" src="${r.image}" onclick="showRecipeDetail(${r.id})">
+
+            <div class="recipe-content">
+                <h3 class="recipe-title" onclick="showRecipeDetail(${r.id})">${r.title}</h3>
+                <span class="recipe-category">${r.category}</span>
+
+                <p style="color:#666;margin:10px 0">⏱️ ${r.prepTime} min • ❤️ ${r.likes} likes</p>
+
+                <div class="recipe-rating" style="margin:6px 0;">
+                    ${renderStars(r.rating)}
+                </div>
+
+                <div class="recipe-actions">
+                    <button class="action-btn like-btn ${isLiked ? "liked" : ""}"
+                        onclick="event.stopPropagation(); toggleLike(${r.id}, ${r.likes})">
+                        ${isLiked ? "❤️" : "🤍"} ${r.likes}
+                    </button>
+
+                    <button class="action-btn" onclick="event.stopPropagation(); shareRecipe(${r.id})">
+                        Share
+                    </button>
+                </div>
+            </div>
+
+        </div>
+        `;
+    }).join("");
+}
+
+
+function toggleFavorite(id) {
+    if (!currentUser) return openLoginModal();
+
+    currentUser.favorites = currentUser.favorites || [];
+
+    if (currentUser.favorites.includes(id)) {
+        currentUser.favorites = currentUser.favorites.filter(f => f !== id);
+    } else {
+        currentUser.favorites.push(id);
+    }
+
+    localStorage.setItem("currentUser", JSON.stringify(currentUser));
+
+    renderRecipes();
+    renderHero();
+}
+
 
 /***************************************************
  * LIKE SYSTEM
@@ -309,7 +411,39 @@ function showRecipeDetail(id) {
             <h2 style="font-family:Georgia;margin-bottom:10px">${r.title}</h2>
             <p style="color:#666;margin-bottom:20px">📁 ${r.category} • ⏱️ ${r.prepTime} min • 👤 ${r.author}</p>
 
-            <img src="${r.image}" style="width:100%;border-radius:10px;margin-bottom:20px">
+            <img src="${r.image}" style="width:100%;border-radius:10px;margin-bottom:20px;position:relative;">
+            <button
+                onclick="toggleFavorite(${r.id}); event.stopPropagation();" 
+                class="fav-btn-modal"
+                style="
+                    position:absolute;
+                    top:20px;
+                    right:20px;
+                    background:white;
+                    border:none;
+                    border-radius:50%;
+                    width:45px;
+                    height:45px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:22px;
+                    cursor:pointer;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+                ">
+                ${currentUser?.favorites?.includes(r.id) ? "❤️" : "🤍"}
+            </button>
+            <!-- ⭐ STAR RATING -->
+            <div class="rating-box" style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+                <div class="rating-stars" style="display:flex;gap:4px;">
+                    <i class="star fa-solid fa-star" data-value="1" style="cursor:pointer;font-size:22px;color:#000;"></i>
+                    <i class="star fa-solid fa-star" data-value="2" style="cursor:pointer;font-size:22px;color:#000;"></i>
+                    <i class="star fa-solid fa-star" data-value="3" style="cursor:pointer;font-size:22px;color:#000;"></i>
+                    <i class="star fa-solid fa-star" data-value="4" style="cursor:pointer;font-size:22px;color:#000;"></i>
+                    <i class="star fa-solid fa-star" data-value="5" style="cursor:pointer;font-size:22px;color:#000;"></i>
+                </div>
+                <span class="rating-label" style="color:#777;">Rating</span>
+            </div>
 
             <h3 style="margin-top:20px">Ingredients</h3>
             <ul style="margin:10px 0 20px 20px;">
@@ -322,9 +456,16 @@ function showRecipeDetail(id) {
             </ol>
         </div>
     `;
+    // ✅ ADD THIS RIGHT HERE — immediately after innerHTML is set
+    if (currentUser?.favorites?.includes(r.id)) {
+        document.querySelector(".fav-btn-modal").innerHTML = "❤️";
+    } else {
+        document.querySelector(".fav-btn-modal").innerHTML = "🤍";
+    }
 
     modal.classList.add("active");
     document.body.style.overflow = "hidden";
+    activateStarRating();
 }
 
 /***************************************************
@@ -526,3 +667,29 @@ loadRecipes();
 document.getElementById("searchInput").addEventListener("input", renderRecipes);
 document.getElementById("categoryFilter").addEventListener("change", renderRecipes);
 document.getElementById("timeFilter").addEventListener("change", renderRecipes);
+
+/***************************************************
+ * ⭐ STAR RATING SYSTEM
+ ***************************************************/
+function activateStarRating() {
+    const stars = document.querySelectorAll(".rating-stars .star");
+    if (!stars.length) return;
+
+    stars.forEach(star => {
+        star.addEventListener("click", () => {
+            const value = parseInt(star.getAttribute("data-value"));
+
+            // Reset all previous selections
+            stars.forEach(s => s.classList.remove("active"));
+
+            // Activate selected stars
+            stars.forEach(s => {
+                if (parseInt(s.getAttribute("data-value")) <= value) {
+                    s.classList.add("active");
+                }
+            });
+
+            console.log("Selected rating:", value);
+        });
+    });
+}
